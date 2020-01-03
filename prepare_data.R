@@ -20,6 +20,20 @@ get_classes <- Vectorize(function(string){
 })
 
 
+clean_string <- Vectorize(function(string){
+  # Lowercase
+  temp <- tolower(string)
+  # Remove everything that is not a number or letter (may want to keep more 
+  # stuff in your actual analyses). 
+  temp <- stringr::str_replace_all(temp,"[^a-zA-Z\\s]", " ")
+  # Shrink down to just one white space
+  temp <- stringr::str_replace_all(temp,"[\\s]+", " ")
+  ## remove any whitespace at beginning or end of line
+  temp <- stringr::str_trim(temp)
+  
+  return(temp)
+})
+
 ## DownloadData ------------------------
 
 # On this website;
@@ -68,7 +82,7 @@ dim(movie_plots)
 
 set.seed(21122019)
 
-movies <- movie_metadata %>%
+movies <- movie_metadata %>% 
     copy(.) %>% 
     .[, .(V1, V3, V9)] %>% 
     data.table::setnames(., c("ID", "Title", "messy_genres")) %>% 
@@ -79,6 +93,7 @@ movies <- movie_metadata %>%
                                  by.x = "ID", 
                                  by.y = "V1") %>% 
     data.table::setnames(., "V2", "Plot") %>% 
+    .[, clean_text := clean_string(Plot)] %>%
     .[, dataset := sample(x = c("TRAIN", "DEV", "TEST"), size = .N, replace = TRUE, prob = c(.8, .1, .1))]
 
 
@@ -97,32 +112,19 @@ movies <- readRDS(file = "movie_plot_genre.rds")
 ## EDA --------------------------
 
 # look at the distribution of genres
-sapply(X = movies[1:5], 
-       FUN = function(x){
-           strsplit(x$Genres, split = ',')[[1]] %>% 
-               paste(., x$ID, sep = '-')
-       }) %>%
-    unlist(x = ., use.names = FALSE)
 
-
-apply(X = movies[1:5], MARGIN = 1, 
-      FUN = function(x){
-          strsplit(x$Genres, split = ',')[[1]] #%>% 
-              # paste(., x$ID, sep = '-')
-      }) %>%
-    unlist(x = ., use.names = FALSE)
-
-genres_tmp1 <- mapply(function(Genres, Title){
+genres_tmp1 <- mapply(function(Genres, Title, ID){
     FUN = strsplit(Genres, split = ',')[[1]] %>% 
-        paste(., Title, sep = ',,,')},
-    movies$Genres, movies$Title) %>% 
+        paste(., Title, ID, sep = ',,,')}, 
+    movies$Genres, movies$Title, movies$ID) %>% 
     unlist(x = ., use.names = FALSE) %>% 
     strsplit(., split = ',,,') 
 
-genres_tmp2 <- sapply(genres_tmp1, FUN = function(x){x[1]})
-genres_tmp3 <- sapply(genres_tmp1, FUN = function(x){x[2]})
+genres_tmp_genre <- sapply(genres_tmp1, FUN = function(x){x[1]})
+genres_tmp_title <- sapply(genres_tmp1, FUN = function(x){x[2]})
+genres_tmp_id <- sapply(genres_tmp1, FUN = function(x){x[3]})
 
-genres_df <- data.table(Title = genres_tmp3, Genre = genres_tmp2)
+genres_df <- data.table(ID = genres_tmp_id, Title = genres_tmp_title, Genre = genres_tmp_genre)
 
 genres_df %>% View()                      
 
@@ -131,6 +133,8 @@ dim(movies)
 # [1] 42207     5
 length(unique(genres_df$Title))
 # [1] 39917
+length(unique(genres_df$ID))
+# [1] 42207
 
 # so might have some repeat movies titles...
 length(unique(movies$Title))
@@ -153,7 +157,7 @@ movies[duplicated(movies$Title) | duplicated(movies$Title, fromLast=TRUE), Title
 # what is the distribution of number of genres per movie?
 
 num_genre_df <- genres_df %>%
-    .[, .(num_genres = .N), by = Title] %>% 
+    .[, .(num_genres = .N), by = .(ID, Title)] %>% 
     .[order(-num_genres)]
     
 num_genre_df %>% View()
@@ -168,16 +172,6 @@ g2 <- ggplot(data = num_genre_df,
     geom_boxplot()
 g2
 
-# let's look at the genres for the top 5 movies with the most genres
-num_genre_df %>% 
-    head(., 5) %>% 
-    merge.data.table(x = .,
-                     y = movies,
-                     by.x = "Title", 
-                     by.y = "Title") %>% 
-    View(.)
-
-# the outliers are due to repeated film titles.
 
 # let's look at the genres
 
