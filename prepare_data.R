@@ -14,7 +14,7 @@ library(ruimtehol)
 get_classes <- Vectorize(function(string){
   
   if(string == "{}"){
-    return('no genre')
+    return("")
   }
   
   temp <- strsplit(string[1], split = '\\"')[[1]]
@@ -141,7 +141,7 @@ movies <- movie_metadata %>%
 
 
 movies %>% dim()
-# [1] 41409     6
+# [1] 41415     6
 View(movies)
 
 movies$dataset %>% table(.)
@@ -155,11 +155,18 @@ movies <- readRDS(file = "movie_plot_genre.rds")
 ## EDA --------------------------
 
 dim(movies)
-# [1] 41409     6
+# [1] 41415     6
 
 # so might have some repeat movies titles...
 length(unique(movies$Title))
-# [1] 39176
+# [1] 39182
+
+# check count of unique genres
+movies %>% 
+  copy() %>% 
+  .[, clean_genres_vectors := sapply(clean_genres, function(x){strsplit(x, ',')[[1]]})] %>% 
+  .[, clean_genres_vectors] %>% 
+  unlist() %>% unique()
 
 length(unique(movies$ID))
 # [1] 41409
@@ -175,7 +182,6 @@ movies[duplicated(movies$Title) | duplicated(movies$Title, fromLast=TRUE), Title
 # [1] 1790
 
 # what is the distribution of number of genres per movie?
-
 num_genre_df <- movies %>%
   .[, .(clean_genres, Title)] %>% 
   .[, num_genres := stringr::str_count(clean_genres, "\\,") + 1] %>% 
@@ -195,12 +201,9 @@ g2
 
 
 # let's look at the genres
-
 popular_genres %>% 
   .[, cumsum := cumsum(V1)/sum(V1)] %>% 
   View()
-
-popular_genres %>% View
 # The top 12 genres account for over 50% of the genres
 # (all genres that is, not just the top 50)
 
@@ -222,9 +225,6 @@ saveRDS(object = word_frequencies, file = 'word_frequencies.rds')
 
 ## Modellings ----------------
 
-# prepare x
-x_values <- movies$clean_text[movies$dataset == "TRAIN"]
-
 # prepare y
 labels <- movies %>% 
   .[movies$dataset == "TRAIN"] %>% 
@@ -232,7 +232,7 @@ labels <- movies %>%
   .[, clean_genres_vectors]
 
 length(labels)
-View(labels)
+# View(labels)
 labels %>% head
 
 text <- movies[dataset == 'TRAIN', clean_text]
@@ -252,10 +252,14 @@ model <- ruimtehol::embed_tagspace(x = text
 
 # save model
 model_name <- "model_2020-01-07"
-starspace_save_model(model, model_name)
+starspace_save_model(model, paste0('models/', model_name))
 
 # load model
-model <- starspace_load_model(model_name)
+model <- starspace_load_model(paste0('models/', model_name))
 
 
-predict(model, newdata = movies$clean_text[1], type = 'labels')
+abc <- predict(model, newdata = movies$clean_text[7], type = 'labels')
+abc <- abc[3:length(abc)]
+length(abc)
+
+
