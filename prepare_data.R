@@ -60,6 +60,25 @@ clean_string <- Vectorize(function(string){
   return(temp)
 })
 
+
+top_n_predictions <- function(text, n){
+  temp <- predict(model, newdata = text, type = 'labels')
+  temp <- temp[1, 3:length(temp)]
+  temp <- sort(temp, decreasing = TRUE)[1:n]
+  temp <- colnames(temp)
+  temp <- paste(temp, collapse = ',')
+  return(temp)
+}
+
+
+our_metric <- function(model, text, genres){
+  temp <- predict(model, newdata = text, type = 'labels')
+  temp <- temp[,strsplit(genres, ',')[[1]]] %>% as.numeric(.)
+  temp <- mean(temp)
+  return(temp)
+}
+
+
 ## DownloadData ------------------------
 
 # On this website;
@@ -258,8 +277,23 @@ starspace_save_model(model, paste0('models/', model_name))
 model <- starspace_load_model(paste0('models/', model_name))
 
 
-abc <- predict(model, newdata = movies$clean_text[7], type = 'labels')
-abc <- abc[3:length(abc)]
-length(abc)
 
+# get metrics and genre predictions
+nrow_movies <- nrow(movies)
+metrics <- rep(0, nrow_movies)
+predictions <- rep("", nrow_movies)
 
+for (i in 1:nrow_movies) {
+  metrics[i] <- our_metric(model = model, text = movies$clean_text[i], genres = movies$clean_genres[i])
+  predictions[i] <- top_n_predictions(text = movies$clean_text[i], n = 5)
+}
+
+movie_predictions <- movies %>%
+  copy() %>% 
+  .[, top_5_genres := predictions] %>% 
+  .[, metrics := metrics] %>% 
+  .[, c("ID", "metrics", "Title", "clean_genres", "top_5_genres", "Plot", "clean_text", "dataset"), with = FALSE]
+
+movie_predictions %>% View
+
+saveRDS(object = movie_predictions, file = 'movie_predictions.rds')
