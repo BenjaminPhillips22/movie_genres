@@ -154,34 +154,16 @@ movies <- readRDS(file = "movie_plot_genre.rds")
 
 ## EDA --------------------------
 
-# look at the distribution of genres
-
-genres_tmp1 <- mapply(function(Genres, Title, ID){
-  FUN = strsplit(Genres, split = ',')[[1]] %>% 
-    paste(., Title, ID, sep = ',,,')}, 
-  movies$Genres, movies$Title, movies$ID) %>% 
-  unlist(x = ., use.names = FALSE) %>% 
-  strsplit(., split = ',,,') 
-
-genres_tmp_genre <- sapply(genres_tmp1, FUN = function(x){x[1]})
-genres_tmp_title <- sapply(genres_tmp1, FUN = function(x){x[2]})
-genres_tmp_id <- sapply(genres_tmp1, FUN = function(x){x[3]})
-
-genres_df <- data.table(ID = genres_tmp_id, Title = genres_tmp_title, Genre = genres_tmp_genre)
-
-genres_df %>% View()                      
-
-# how many movies?
 dim(movies)
-# [1] 42207     5
-length(unique(genres_df$Title))
-# [1] 39917
-length(unique(genres_df$ID))
-# [1] 42207
+# [1] 41409     6
 
 # so might have some repeat movies titles...
 length(unique(movies$Title))
-# [1] 39917
+# [1] 39176
+
+length(unique(movies$ID))
+# [1] 41409
+# ID's are all unique, so don't need to worry about duplicate rows
 
 # what are the repeated movies?
 movies[duplicated(movies$Title) | duplicated(movies$Title, fromLast=TRUE)] %>% 
@@ -190,17 +172,13 @@ movies[duplicated(movies$Title) | duplicated(movies$Title, fromLast=TRUE)] %>%
 movies[duplicated(movies$Title) | duplicated(movies$Title, fromLast=TRUE), Title] %>% 
   unique(.) %>% 
   length()
-# [1] 1830
-
-# 1830 repeated movie titles. some are different movies with the same title, most are
-# the same movie. Due to the general inconsistancy that the movies are labelled,
-# I am happy to leave those repeated movies in, as the have different plot descriptions,
-# even for the same movie, and different genres.
+# [1] 1790
 
 # what is the distribution of number of genres per movie?
 
-num_genre_df <- genres_df %>%
-  .[, .(num_genres = .N), by = .(ID, Title)] %>% 
+num_genre_df <- movies %>%
+  .[, .(clean_genres, Title)] %>% 
+  .[, num_genres := stringr::str_count(clean_genres, "\\,") + 1] %>% 
   .[order(-num_genres)]
 
 num_genre_df %>% View()
@@ -218,14 +196,17 @@ g2
 
 # let's look at the genres
 
-popular_genres <- genres_df %>% 
-  .[, .(count = .N), by = Genre] %>% 
-  .[order(-count)] %>% 
-  .[, cumsum := cumsum(count)/sum(count)]
+popular_genres %>% 
+  .[, cumsum := cumsum(V1)/sum(V1)] %>% 
+  View()
 
 popular_genres %>% View
-# The top 10 genres account for 46% of the genres
-# The top 74 genres account for 90% of the genres
+# The top 12 genres account for over 50% of the genres
+# (all genres that is, not just the top 50)
+
+popular_genres[1:50, ] %>% 
+  .[, cumsum := cumsum(V1)/sum(V1)] %>% 
+  View()
 
 
 # Let's look at word counts for the plots
