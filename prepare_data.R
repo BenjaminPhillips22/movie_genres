@@ -226,30 +226,21 @@ saveRDS(object = word_frequencies, file = 'word_frequencies.rds')
 x_values <- movies$clean_text[movies$dataset == "TRAIN"]
 
 # prepare y
-# we will only use the top 50 most popular genres
-prep_genres <- Vectorize(function(arg){
-  temp <- strsplit(arg, ",")
-  temp <- unlist(temp)
-  temp <- temp[temp %in% popular_genres$Genre[1:50]]
-  if (length(temp) == 0) {
-    temp <- "no_genre"
-    return(temp)
-  }
-  temp <- gsub(pattern = ' ', replacement = '_', x = temp)
-  temp <- gsub(pattern = '-', replacement = '_', x = temp)
-  temp <- gsub(pattern = '/', replacement = '_', x = temp)
-  return(temp)
-}, USE.NAMES = FALSE)
-labels <- prep_genres(movies$Genres[movies$dataset == "TRAIN"])
+labels <- movies %>% 
+  .[movies$dataset == "TRAIN"] %>% 
+  .[, clean_genres_vectors := sapply(clean_genres, function(x){strsplit(x, ',')[[1]]})] %>% 
+  .[, clean_genres_vectors]
 
 length(labels)
 View(labels)
-length(x_values)
-length(labels)
-x_values %>% View
 labels %>% head
 
-model <- ruimtehol::embed_tagspace(x = movies$clean_text
+text <- movies[dataset == 'TRAIN', clean_text]
+
+length(text)
+class(text)
+
+model <- ruimtehol::embed_tagspace(x = text
                                    ,y = labels
                                    ,dim = 20
                                    ,epoch = 100
@@ -260,10 +251,11 @@ model <- ruimtehol::embed_tagspace(x = movies$clean_text
                                    ,minCount = 1000)
 
 # save model
-starspace_save_model(model, "model_2020-01-04")
+model_name <- "model_2020-01-07"
+starspace_save_model(model, model_name)
 
 # load model
-model <- starspace_load_model("model_2020-01-04")
+model <- starspace_load_model(model_name)
 
 
 predict(model, newdata = movies$clean_text[1], type = 'labels')
