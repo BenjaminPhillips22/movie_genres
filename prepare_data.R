@@ -21,7 +21,22 @@ get_classes <- Vectorize(function(string){
   temp <- temp[seq(4, length(temp), 4)]
   temp <- tolower(temp)
   
+  # Remove everything that is not a number or letter
+  temp <- stringr::str_replace_all(temp,"[^a-zA-Z\\s]", "")
+  # Shrink down to just one white space
+  temp <- stringr::str_replace_all(temp,"[\\s]+", " ")
+  temp <- gsub(pattern = ' ', replacement = '_', x = temp)
+  temp <- stringr::str_trim(temp)
+  
   return(paste(temp, collapse = ","))
+})
+
+
+top_n_genres <- Vectorize(function(mov_gen){
+  temp <- strsplit(mov_gen, ',')[[1]]
+  temp <- temp[temp %in% popular_genres$word[1:50]]
+  temp <- paste(temp, collapse = ',')
+  return(temp)
 })
 
 
@@ -91,14 +106,31 @@ dim(movie_plots)
 # test No Genre
 # get_classes(a1[19])
 
+# get popular genres
+popular_genres <- movie_metadata %>% 
+  copy(.) %>% 
+  .[, .(V9)] %>% 
+  data.table::setnames(., c("messy_genres")) %>% 
+  .[, clean_genres := get_classes(messy_genres)] %>% 
+  .[, messy_genres := NULL] %>% 
+  tidytext::unnest_tokens(., "word", clean_genres) %>% 
+  .[, (word_freq = .N), keyby = word] %>% 
+  .[order(-V1)]
+  
+popular_genres %>% View()
+#
+
 set.seed(21122019)
 
 movies <- movie_metadata %>% 
   copy(.) %>% 
   .[, .(V1, V3, V9)] %>% 
   data.table::setnames(., c("ID", "Title", "messy_genres")) %>% 
-  .[, Genres := get_classes(messy_genres)] %>% 
-  .[, messy_genres := NULL] %>% 
+  .[, clean_genres := get_classes(messy_genres)] %>% 
+  .[, clean_genres := top_n_genres(mov_gen = clean_genres)] %>%
+  # remove rows that now have no genres
+  .[clean_genres != ""] %>% 
+  .[, messy_genres := NULL] %>%
   data.table::merge.data.table(x = .,
                                y = movie_plots,
                                by.x = "ID", 
@@ -109,8 +141,8 @@ movies <- movie_metadata %>%
 
 
 movies %>% dim()
-# [1] 42207     4
-movies %>% View()
+# [1] 41409     6
+View(movies)
 
 movies$dataset %>% table(.)
 
