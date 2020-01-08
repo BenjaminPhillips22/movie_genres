@@ -43,18 +43,17 @@ top_n_genres <- Vectorize(function(mov_gen){
 clean_string <- Vectorize(function(string){
   # Lowercase
   temp <- tolower(string)
-  # Remove everything that is not a number or letter (may want to keep more 
-  # stuff in your actual analyses). 
+  # Remove puncuation
   temp <- stringr::str_replace_all(temp,"[^a-zA-Z\\s]", " ")
   # Shrink down to just one white space
   temp <- stringr::str_replace_all(temp,"[\\s]+", " ")
-  # remove stop words
+  # Remove stop words
   temp <- unlist(strsplit(temp, " "))
   temp <- temp[!temp %in% stop_words$word]
   temp <- paste(temp, collapse = " ")
-  # stem words
+  # Stem words
   temp <- textstem::stem_strings(temp)
-  ## remove any whitespace at beginning or end of line
+  ## Remove any whitespace at beginning or end of line
   temp <- stringr::str_trim(temp)
   
   return(temp)
@@ -93,8 +92,6 @@ if (FALSE) {
   download.file(fn,destfile="MovieSummaries.tar.gz")
   untar("MovieSummaries.tar.gz",list=TRUE)  ## check contents
   untar("MovieSummaries.tar.gz")
-  ## or, if you just want to extract the target file:
-  # untar("tmp.tar.gz",files="wp2011-survey/anon-data.csv")
 }
 
 
@@ -231,7 +228,7 @@ popular_genres[1:50, ] %>%
   View()
 
 
-# Let's look at word counts for the plots
+# Let's look at word counts
 word_frequencies <- movies %>%
   .[, "clean_text"] %>% 
   tidytext::unnest_tokens(., "word", clean_text) %>% 
@@ -251,9 +248,9 @@ labels <- movies %>%
   .[, clean_genres_vectors]
 
 length(labels)
-# View(labels)
 labels %>% head
 
+# prepare y
 text <- movies[dataset == 'TRAIN', clean_text]
 
 length(text)
@@ -297,3 +294,17 @@ movie_predictions <- movies %>%
 movie_predictions %>% View
 
 saveRDS(object = movie_predictions, file = 'movie_predictions.rds')
+
+movie_predictions <- readRDS('movie_predictions.rds')
+
+# average of our metric
+results <- movie_predictions %>% 
+  .[, .(avg_metric = mean(metrics, na.rm = TRUE)), by = dataset]
+
+results
+# dataset avg_metric
+# 1:   TRAIN  0.1372981
+# 2:     DEV  0.1330690
+# 3:    TEST  0.1324563
+
+
